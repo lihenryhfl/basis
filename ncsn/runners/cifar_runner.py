@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import tqdm
 
 from ncsn.models.cond_refinenet_dilated import CondRefineNetDilated
 from torchvision.datasets import MNIST, CIFAR10
@@ -30,7 +31,7 @@ class CifarRunner():
         batch_size = 100
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
-        for i, (x, y) in enumerate(dataloader):
+        for i, (x, y) in enumerate(tqdm.tqdm(dataloader, desc='processing batches')):
             x = x.to(self.config.device)
             # Split the batch into even and odd elements
             x0 = x[0::2]
@@ -57,7 +58,7 @@ class CifarRunner():
                                0.07742637, 0.04641589, 0.02782559, 0.01668101, 0.01])
             n_steps_each = 100
 
-            for idx, sigma in enumerate(sigmas):
+            for idx, sigma in enumerate(tqdm.tqdm(sigmas, desc='annealed Langevin dynamics')):
                 lambda_recon = 1./sigma**2
                 labels = torch.ones(1, device=x0.device) * idx
                 labels = labels.long()

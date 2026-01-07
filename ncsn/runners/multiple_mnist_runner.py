@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import tqdm
 
 from ncsn.models.cond_refinenet_dilated import CondRefineNetDilated
 from torchvision.datasets import MNIST
@@ -84,7 +85,7 @@ class MnistRunner():
         batch_size = 128  # Use 128 so x0 and x1 are size 64
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
-        for i, (x, y) in enumerate(dataloader):
+        for i, (x, y) in enumerate(tqdm.tqdm(dataloader, desc='processing batches')):
             if x.shape[0] < 2:
                 continue
             if x.shape[0] % 2 != 0:
@@ -118,7 +119,7 @@ class MnistRunner():
                                0.07742637, 0.04641589, 0.02782559, 0.01668101, 0.01])
             n_steps_each = 100
 
-            for sigma_idx, sigma in enumerate(sigmas):
+            for sigma_idx, sigma in enumerate(tqdm.tqdm(sigmas, desc='annealed Langevin dynamics')):
                 lambda_recon = 1./(sigma**2)
                 labels = torch.ones(1, device=self.config.device) * sigma_idx
                 labels = labels.long()
