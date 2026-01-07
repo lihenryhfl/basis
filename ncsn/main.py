@@ -39,7 +39,7 @@ def parse_args_and_config():
         new_config = dict2namespace(config)
     else:
         with open(os.path.join(args.log, 'config.yml'), 'r') as f:
-            config = yaml.load(f)
+            config = yaml.load(f, Loader=yaml.UnsafeLoader)
         new_config = config
 
     if not args.test:

@@ -1,7 +1,7 @@
 import sys,argparse
 
 import ncsn.main as ncsn
-import glow.sep as glow
+# import glow.sep as glow
 
 if __name__ == '__main__':
 
