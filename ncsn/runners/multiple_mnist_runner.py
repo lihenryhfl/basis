@@ -163,6 +163,8 @@ class MnistRunner():
             self.write_images((xs[0] + xs[1]).detach().cpu()/2., 'mixed_approx', indices0, indices1)
 
     def write_images(self, x, prefix, indices, indices2=None):
+        if not os.path.exists(self.args.image_folder):
+            os.makedirs(self.args.image_folder)
         # x is (B, C, H, W)
         x = x.numpy().transpose(0, 2, 3, 1)
         for k in range(x.shape[0]):

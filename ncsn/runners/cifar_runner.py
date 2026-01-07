@@ -86,6 +86,8 @@ class CifarRunner():
                 self.write_images(x1.detach().cpu(), 'y', indices1)
 
     def write_images(self, x, prefix, indices, indices2=None):
+        if not os.path.exists(self.args.image_folder):
+            os.makedirs(self.args.image_folder)
         x = x.numpy().transpose(0, 2, 3, 1)
         for k in range(x.shape[0]):
             img = (256 * x[k]).clip(0, 255).astype(np.uint8)[:, :, ::-1]
