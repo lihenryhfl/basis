@@ -18,6 +18,7 @@ __all__ = ['MnistRunner']
 
 BATCH_SIZE = 64
 N = 2  # Number of digits
+DEBUG = False
 
 def psnr(est, gt):
     """Returns the P signal to noise ratio between the estimate and gt"""
@@ -113,61 +114,62 @@ class MnistRunner():
             mixed = (x0 + x1)
             self.write_images(mixed.cpu()/2., 'mix', indices0, indices1)
 
-            # Parameters to optimize (initialize with uniform noise)
-            xs = [
-                nn.Parameter(torch.Tensor(x0.shape).uniform_().to(self.config.device)),
-                nn.Parameter(torch.Tensor(x1.shape).uniform_().to(self.config.device))
-            ]
+            if not DEBUG:
+                # Parameters to optimize (initialize with uniform noise)
+                xs = [
+                    nn.Parameter(torch.Tensor(x0.shape).uniform_().to(self.config.device)),
+                    nn.Parameter(torch.Tensor(x1.shape).uniform_().to(self.config.device))
+                ]
 
-            step_lr = 0.00003
-            sigmas = np.array([1., 0.59948425, 0.35938137, 0.21544347, 0.12915497,
-                               0.07742637, 0.04641589, 0.02782559, 0.01668101, 0.01])
-            n_steps_each = 100
+                step_lr = 0.00003
+                sigmas = np.array([1., 0.59948425, 0.35938137, 0.21544347, 0.12915497,
+                                    0.07742637, 0.04641589, 0.02782559, 0.01668101, 0.01])
+                n_steps_each = 100
 
-            for sigma_idx, sigma in enumerate(tqdm.tqdm(sigmas, desc='annealed Langevin dynamics')):
-                lambda_recon = 1./(sigma**2)
-                labels = torch.ones(1, device=self.config.device) * sigma_idx
-                labels = labels.long()
-                step_size = step_lr * (sigma / sigmas[-1]) ** 2
+                for sigma_idx, sigma in enumerate(tqdm.tqdm(sigmas, desc='annealed Langevin dynamics')):
+                    lambda_recon = 1./(sigma**2)
+                    labels = torch.ones(1, device=self.config.device) * sigma_idx
+                    labels = labels.long()
+                    step_size = step_lr * (sigma / sigmas[-1]) ** 2
 
-                for step in range(n_steps_each):
-                    noises = [torch.randn_like(xs[j]) * np.sqrt(step_size * 2) for j in range(2)]
-                    
-                    grads = [scorenet(xs[j], labels).detach() for j in range(2)]
+                    for step in range(n_steps_each):
+                        noises = [torch.randn_like(xs[j]) * np.sqrt(step_size * 2) for j in range(2)]
+                        
+                        grads = [scorenet(xs[j], labels).detach() for j in range(2)]
 
-                    recon_loss = (torch.norm(torch.flatten(xs[0] + xs[1] - mixed)) ** 2)
-                    recon_grads = torch.autograd.grad(recon_loss, xs)
+                        recon_loss = (torch.norm(torch.flatten(xs[0] + xs[1] - mixed)) ** 2)
+                        recon_grads = torch.autograd.grad(recon_loss, xs)
 
-                    for j in range(2):
-                        xs[j].data = xs[j].data + (step_size * grads[j]) + (-step_size * lambda_recon * recon_grads[j].detach()) + noises[j]
+                        for j in range(2):
+                            xs[j].data = xs[j].data + (step_size * grads[j]) + (-step_size * lambda_recon * recon_grads[j].detach()) + noises[j]
 
-            for j in range(2):
-                xs[j].data = torch.clamp(xs[j].data, 0, 1)
-
-            # PSNR Measure and Permutation Correction
-            x_final = [torch.zeros_like(x0.cpu()) for _ in range(2)]
-            for idx in range(x0.shape[0]):
-                best_psnr = -10000
-                best_permutation = None
-                
-                # Check ground truth x0 vs xs[0] and x1 vs xs[1] or vice-versa
-                # gt_images in this case are x0[idx] and x1[idx]
-                gt = [x0[idx], x1[idx]]
-                
-                for p in permutations(range(2)):
-                    curr_psnr = sum([psnr(xs[p[j]][idx], gt[j]) for j in range(2)])
-                    if curr_psnr > best_psnr:
-                        best_psnr = curr_psnr
-                        best_permutation = p
-                
                 for j in range(2):
-                    x_final[j][idx] = xs[best_permutation[j]][idx].detach().cpu()
+                    xs[j].data = torch.clamp(xs[j].data, 0, 1)
 
-            # Save results
-            self.write_images(x_final[0], 'x0', indices0)
-            self.write_images(x_final[1], 'x1', indices1)
-            gen_mix = (x_final[0] + x_final[1]) / 2.
-            self.write_images(gen_mix, 'mixed_approx', indices0, indices1)
+                # PSNR Measure and Permutation Correction
+                x_final = [torch.zeros_like(x0.cpu()) for _ in range(2)]
+                for idx in range(x0.shape[0]):
+                    best_psnr = -10000
+                    best_permutation = None
+                    
+                    # Check ground truth x0 vs xs[0] and x1 vs xs[1] or vice-versa
+                    # gt_images in this case are x0[idx] and x1[idx]
+                    gt = [x0[idx], x1[idx]]
+                    
+                    for p in permutations(range(2)):
+                        curr_psnr = sum([psnr(xs[p[j]][idx], gt[j]) for j in range(2)])
+                        if curr_psnr > best_psnr:
+                            best_psnr = curr_psnr
+                            best_permutation = p
+                    
+                    for j in range(2):
+                        x_final[j][idx] = xs[best_permutation[j]][idx].detach().cpu()
+
+                # Save results
+                self.write_images(x_final[0], 'x0', indices0)
+                self.write_images(x_final[1], 'x1', indices1)
+                gen_mix = (x_final[0] + x_final[1]) / 2.
+                self.write_images(gen_mix, 'mixed_approx', indices0, indices1)
 
             # Store in results list
             for idx in range(x0.shape[0]):
@@ -177,10 +179,13 @@ class MnistRunner():
                     'gt_x0': x0[idx].cpu().numpy(),
                     'gt_x1': x1[idx].cpu().numpy(),
                     'gt_mix': (mixed[idx].cpu().numpy() / 2.),
-                    'gen_x0': x_final[0][idx].numpy(),
-                    'gen_x1': x_final[1][idx].numpy(),
-                    'gen_mix': gen_mix[idx].numpy()
                 }
+                if not DEBUG:
+                    result.update({
+                        'gen_x0': x_final[0][idx].numpy(),
+                        'gen_x1': x_final[1][idx].numpy(),
+                        'gen_mix': gen_mix[idx].numpy()
+                    })
                 all_results.append(result)
 
         # Save to pickle file
