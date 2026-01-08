@@ -170,7 +170,7 @@ class MnistRunner():
         x = x.numpy().transpose(0, 2, 3, 1)
         for k in range(x.shape[0]):
             assert x[k].min() >= 0 and x[k].max() <= 1, f"{x[k].min()}, {x[k].max()}"
-            img = (256 * x[k]).clip(0, 255).astype(np.uint8)
+            img = np.round(255 * x[k]).clip(0, 255).astype(np.uint8)
             # If it's single channel (MNIST), cv2.imwrite expect H,W or H,W,3
             if img.shape[2] == 1:
                 img = img[:, :, 0]

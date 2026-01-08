@@ -91,7 +91,7 @@ class CifarRunner():
             os.makedirs(self.args.image_folder)
         x = x.numpy().transpose(0, 2, 3, 1)
         for k in range(x.shape[0]):
-            img = (256 * x[k]).clip(0, 255).astype(np.uint8)[:, :, ::-1]
+            img = np.round(255 * x[k]).clip(0, 255).astype(np.uint8)[:, :, ::-1]
             if indices2 is not None:
                 filename = f"{prefix}_{indices[k]:05d}_{indices2[k]:05d}.png"
             else:
