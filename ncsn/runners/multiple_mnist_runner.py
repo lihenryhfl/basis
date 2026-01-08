@@ -1,6 +1,7 @@
 import os
 from copy import deepcopy
 from itertools import permutations
+import pickle
 
 import cv2
 import numpy as np
@@ -85,12 +86,16 @@ class MnistRunner():
         batch_size = 128  # Use 128 so x0 and x1 are size 64
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
+        all_results = []
+
         for i, (x, y) in enumerate(tqdm.tqdm(dataloader, desc='processing batches')):
             if x.shape[0] < 2:
                 continue
             if x.shape[0] % 2 != 0:
                 x = x[:-1]
                 y = y[:-1]
+
+            print(f"Mean x: {x.mean()}")
 
             x = x.to(self.config.device)
             # Split the batch into even and odd elements
@@ -161,7 +166,28 @@ class MnistRunner():
             # Save results
             self.write_images(x_final[0], 'x0', indices0)
             self.write_images(x_final[1], 'x1', indices1)
-            self.write_images((xs[0] + xs[1]).detach().cpu()/2., 'mixed_approx', indices0, indices1)
+            gen_mix = (x_final[0] + x_final[1]) / 2.
+            self.write_images(gen_mix, 'mixed_approx', indices0, indices1)
+
+            # Store in results list
+            for idx in range(x0.shape[0]):
+                result = {
+                    'index0': int(indices0[idx]),
+                    'index1': int(indices1[idx]),
+                    'gt_x0': x0[idx].cpu().numpy(),
+                    'gt_x1': x1[idx].cpu().numpy(),
+                    'gt_mix': (mixed[idx].cpu().numpy() / 2.),
+                    'gen_x0': x_final[0][idx].numpy(),
+                    'gen_x1': x_final[1][idx].numpy(),
+                    'gen_mix': gen_mix[idx].numpy()
+                }
+                all_results.append(result)
+
+        # Save to pickle file
+        pickle_path = os.path.join(self.args.image_folder, 'results.pkl')
+        with open(pickle_path, 'wb') as f:
+            pickle.dump(all_results, f)
+        print(f"Stored {len(all_results)} results in {pickle_path}")
 
     def write_images(self, x, prefix, indices, indices2=None):
         if not os.path.exists(self.args.image_folder):
